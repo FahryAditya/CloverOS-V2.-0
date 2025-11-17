@@ -1,0 +1,47 @@
+# Makefile - Build CloverOS
+
+# Tools
+ASM = nasm
+CC = i686-elf-g++
+LD = i686-elf-ld
+CFLAGS = -ffreestanding -m32 -O2 -Wall -Wextra
+LDFLAGS = -T linker.ld -m elf_i386
+
+# Files
+BOOTLOADER = bootloader.asm
+KERNEL_ENTRY = kernel_entry.asm
+KERNEL_CPP = kernel.cpp
+KERNEL_BIN = kernel.bin
+OS_IMAGE = os-image.bin
+
+# Default target
+all: $(OS_IMAGE)
+
+# Build bootloader
+bootloader.bin: $(BOOTLOADER)
+	$(ASM) -f bin $(BOOTLOADER) -o bootloader.bin
+
+# Build kernel entry (ASM)
+kernel_entry.o: $(KERNEL_ENTRY)
+	$(ASM) -f elf32 $(KERNEL_ENTRY) -o kernel_entry.o
+
+# Build kernel C++
+kernel.o: $(KERNEL_CPP)
+	$(CC) $(CFLAGS) -c $(KERNEL_CPP) -o kernel.o
+
+# Link kernel
+$(KERNEL_BIN): kernel_entry.o kernel.o linker.ld
+	$(LD) $(LDFLAGS) kernel_entry.o kernel.o -o $(KERNEL_BIN)
+
+# Combine bootloader + kernel into OS image
+$(OS_IMAGE): bootloader.bin $(KERNEL_BIN)
+	cat bootloader.bin $(KERNEL_BIN) > $(OS_IMAGE)
+	@echo "Build complete: $(OS_IMAGE)"
+
+# Clean
+clean:
+	rm -f *.o *.bin $(OS_IMAGE)
+
+# Run in QEMU
+run: all
+	qemu-system-i386 -fda $(OS_IMAGE)
